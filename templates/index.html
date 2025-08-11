@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenUpgrade API Documentation</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --bg-color: #f8f9fa;
+            --code-bg: #ecf0f1;
+            --border-color: #e0e0e0;
+            --shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: var(--secondary-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 30px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        h1, h2, h3, h4 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        code {
+            background-color: var(--code-bg);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.95em;
+        }
+
+        .endpoint {
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin: 10px 0 20px;
+            box-shadow: var(--shadow);
+            white-space: pre-wrap;
+            font-size: 0.95em;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        .filter-list li {
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .filter-list code {
+            background-color: #eef1f4;
+            color: #2c3e50;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "SFMono-Regular", Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        em {
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 20px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OpenUpgrade API Documentation</h1>
+        <p>Welcome! This API provides access to upgrade change data analyzed from the OCA/OpenUpgrade repository.</p>
+
+        <h2>Endpoint Structure</h2>
+        <div class="endpoint">
+            <code>GET /&lt;major_version&gt;/changes</code>
+        </div>
+        <ul>
+            <li><code>&lt;major_version&gt;</code>: The major Odoo version you want to query (e.g., <code>16</code>, <code>17</code>, <code>18</code>).</li>
+        </ul>
+
+        <h2>Query Parameters (Filters)</h2>
+        <p><strong>Note:</strong> A request must include <strong>at least one</strong> of the following query parameters to filter the results:</p>
+        <ul class="filter-list">
+            <li>
+                <code>module</code>: Filters changes by a specific module name.<br>
+                <em>Example:</em> <code>?module=account</code>
+            </li>
+            <li>
+                <code>model</code>: Filters changes by a specific model name.<br>
+                <em>Example:</em> <code>?model=res.partner</code>
+            </li>
+            <li>
+                <code>version</code>: Filters changes by a specific version string (prefix match).<br>
+                <em>Example:</em> <code>?version=18.0.1</code> matches 
+                <code>18.0.1.0</code>, <code>18.0.1.3</code>, etc.
+            </li>
+        </ul>
+
+        <h2>Usage Examples</h2>
+
+        <h4>Example 1: Get all changes for the <code>account</code> module in version 18.</h4>
+        <div class="endpoint">
+            <code>/18/changes?module=account</code>
+        </div>
+
+        <h4>Example 2: Get all changes for the <code>res.partner</code> model in version 17.</h4>
+        <div class="endpoint">
+            <code>/17/changes?model=res.partner</code>
+        </div>
+
+        <h4>Example 3: Combine filters to get changes for <code>account.account</code> in version 18.0.1.3.</h4>
+        <div class="endpoint">
+            <code>/18/changes?model=account.account&version=18.0.1.3</code>
+        </div>
+    </div>
+</body>
+</html>
