@@ -3,3 +3,4 @@ Flask-RESTful
 pydantic
 GitPython
 tqdm
+dotenv

@@ -65,11 +65,11 @@ The process involves two main steps executed via the `manage.py` script, followe
 Use the `manage.py sync` command to download the `scripts` directories from the specified OpenUpgrade branches. This will populate the `data_sources/` directory.
 
 ```bash
-# Sync default versions (16, 17, 18)
+# Sync default versions (16.0, 17.0, 18.0)
 python manage.py sync
 
 # Or, sync a specific list of versions
-python manage.py sync --versions 18 17
+python manage.py sync --versions 18.0 17.0
 ```
 
 ### Step 2: Parse Data into Databases
@@ -79,11 +79,11 @@ Use the `manage.py parse` command to process the downloaded files for a specific
 Run this command for each version you have synced.
 
 ```bash
-# Parse data default versions (16, 17, 18)
+# Parse data default versions (16.0, 17.0, 18.0)
 python manage.py parse
 
 # Or, sync a specific list of versions
-python manage.py parse --versions 17 18
+python manage.py parse --versions 17.0 18.0
 ```
 
 ### Step 3: Run the API Server
@@ -104,7 +104,7 @@ The API provides one main endpoint for querying changes.
 
 `GET /<major_version>/changes`
 
-  - **`<major_version>`** (integer): The major Odoo version to query (e.g., `18`).
+  - **`<major_version>`** (float): The major Odoo version to query (e.g., `18.0`).
 
 ### Query Parameters
 
@@ -116,20 +116,20 @@ A request **must include at least one** of the following query parameters:
 
 ### Usage Examples
 
-#### 1\. Get all changes for the `account` module in version 18
+#### 1\. Get all changes for the `account` module in version 18.0
 
 ```bash
-curl "http://127.0.0.1:5000/18/changes?module=account"
+curl "http://127.0.0.1:5000/18.0/changes?module=account"
 ```
 
-#### 2\. Get all changes for the `res.partner` model in version 17
+#### 2\. Get all changes for the `res.partner` model in version 17.0
 
 ```bash
-curl "http://127.0.0.1:5000/17/changes?model=res.partner"
+curl "http://127.0.0.1:5000/17.0/changes?model=res.partner"
 ```
 
 #### 3\. Combine filters to get changes for `account.account` in the `18.0.1.3` release
 
 ```bash
-curl "http://127.0.0.1:5000/18/changes?model=account.account&version=18.0.1.3"
+curl "http://127.0.0.1:5000/18.0/changes?model=account.account&version=18.0.1.3"
 ```

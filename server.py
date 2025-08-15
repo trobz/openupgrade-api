@@ -1,5 +1,5 @@
 import sqlite3
-import json
+import json, glob, re
 from flask import Flask, request, render_template
 from flask_restful import abort, Api, Resource
 from pathlib import Path
@@ -13,7 +13,6 @@ from upgrade_analysis_parser.models import ChangeRecord
 app = Flask(__name__)
 api = Api(app)
 app_name = 'openupgrade-api'
-DB_DIR = Path(DB_PATH)
 
 # Add headers to all responses
 @app.after_request
@@ -29,8 +28,8 @@ def add_headers(response):
     return response
 
 
-def get_db_connection(major_version: int) -> sqlite3.Connection:
-    db_path = DB_DIR / f"upgrade_{major_version}.db"
+def get_db_connection(major_version: float) -> sqlite3.Connection:
+    db_path = Path(DB_PATH) / f"upgrade_{major_version}.db"
     if not db_path.exists():
         abort(
             404,
@@ -43,13 +42,10 @@ def get_db_connection(major_version: int) -> sqlite3.Connection:
 
 
 class ChangesResource(Resource):
-    def get(self, major_version: int):
+    def get(self, major_version: float):
         module_filter = request.args.get('module')
         model_filter = request.args.get('model')
         minor_version_filter = request.args.get('version')
-
-        if not any([module_filter, model_filter, minor_version_filter]):
-            abort(400, message="At least one filter (module, model, version) must be provided.")
 
         try:
             conn = get_db_connection(major_version)
@@ -98,12 +94,33 @@ class ChangesResource(Resource):
             abort(500, message=f"An unexpected processing error occurred: {str(e)}")
 
 
-api.add_resource(ChangesResource, '/<int:major_version>/changes')
+api.add_resource(ChangesResource, '/<float:major_version>/changes')
 
 @app.route('/')
 def index():
     return render_template("index.html")
 
+@app.route('/upgrade_info')
+def upgrade_info():
+    support_versions = [re.search(r'upgrade_(\d*\.\d+)\.db$', f).group(1)
+         for f in glob.glob(f'{DB_PATH}/upgrade_*.db')
+         if re.search(r'upgrade_(\d*\.\d+)\.db$', f)]
+    response = {}
+    for version in support_versions:
+        
+        conn = get_db_connection(version)
+        cursor = conn.cursor()
+
+        query = "SELECT module, GROUP_CONCAT(all_models, ', ') AS all_models FROM ( SELECT DISTINCT module, COALESCE(model_name, record_model) AS all_models FROM changes ) AS sub GROUP BY module;"
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+
+        data = [dict(row) for row in rows]
+        response[version] = data
+
+    return response
 
 if __name__ == '__main__':
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=DEBUG)

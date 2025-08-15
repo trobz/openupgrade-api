@@ -45,6 +45,17 @@ def clear_all_changes(db_path: Path) -> None:
 
 
 def insert_data(db_path: Path, data: List[ChangeRecord]) -> None:
+    seen_raw_lines = set()
+    unique_data = []
+    for d in data:
+        if d.raw_line not in seen_raw_lines:
+            seen_raw_lines.add(d.raw_line)
+            unique_data.append(d)
+
+    if not unique_data:
+        logger.info("No new unique records to insert.")
+        return
+    
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         insert_sql = """
@@ -76,7 +87,7 @@ def insert_data(db_path: Path, data: List[ChangeRecord]) -> None:
                 d.raw_line,
                 json.dumps(d.details_json),
             )
-            for d in data
+            for d in unique_data
         ]
         cursor.executemany(insert_sql, rows_to_insert)
         conn.commit()

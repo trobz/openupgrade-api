@@ -117,7 +117,7 @@ def run_parse_for_version(major_version: int, base_scripts_dir: Path, db_dir: Pa
     setup_database(db_path)
     clear_all_changes(db_path)
 
-    glob_pattern = f"**/{major_version}.*/**/upgrade_analysis.txt"
+    glob_pattern = f"**/{major_version}.*/**/*upgrade_analysis.txt"
     analysis_files = list(base_scripts_dir.glob(glob_pattern))
 
     if not analysis_files:
@@ -126,6 +126,6 @@ def run_parse_for_version(major_version: int, base_scripts_dir: Path, db_dir: Pa
 
     logger.info(f"Found {len(analysis_files)} analysis files for version {major_version}.*.")
     all_changes = [change for file_path in analysis_files for change in UpgradeAnalysisParser(str(file_path)).parse()]
-
+    
     if all_changes:
         insert_data(db_path, all_changes)
