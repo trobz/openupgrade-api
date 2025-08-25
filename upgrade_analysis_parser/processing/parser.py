@@ -1,4 +1,4 @@
-import re
+import re, ast
 from pathlib import Path
 from typing import List, Optional
 
@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 class UpgradeAnalysisParser:
     RE_SECTION = re.compile(r"---(Models|Fields|XML records) in module '(.+?)'---")
-    RE_MODEL = re.compile(r"^(obsolete|new) model\s+([\w\.]+)\s*(\[.+\])?$")
+    RE_MODEL = re.compile(
+        r"^(obsolete|new) model\s+([\w\.]+)\s*(?:\((?P<paren>.+?)\))?\s*(?:\[(?P<tag>.+?)\])?$"
+    )
     RE_FIELD = re.compile(
         r"^(?P<module>\S+)\s*/\s*(?P<model>[\w\.]+)\s*/\s*(?P<field>[\w\.]+)\s*(?:\((?P<type>[\w\.]+)\))?\s*:\s*(?P<desc>.+)$"
     )
@@ -56,7 +58,15 @@ class UpgradeAnalysisParser:
         match = self.RE_MODEL.match(line)
         if not match:
             return None
-        change_type, model_name, tag = match.groups()
+        change_type = match.group(1)
+        model_name = match.group(2)
+        paren = match.group("paren")
+        tag = match.group("tag")
+        details = {}
+        if paren and ("renamed from" in paren or "renamed to" in paren):
+            details["rename_info"] = paren.strip()
+        if tag:
+            details["tag"] = tag
         return ChangeRecord(
             version=self.version,
             module=module,
@@ -64,7 +74,7 @@ class UpgradeAnalysisParser:
             change_type=change_type.upper(),
             model_name=model_name,
             raw_line=line,
-            details_json={"tag": tag.strip("[]") if tag else None},
+            details_json=details,
         )
 
     def _parse_field_line(self, line: str) -> Optional[ChangeRecord]:
@@ -129,3 +139,95 @@ def run_parse_for_version(major_version: int, base_scripts_dir: Path):
     
     if all_changes:
         insert_data(db_path, all_changes)
+
+def parse_pre_migration_for_renamed_fields(py_path: Path) -> list[tuple[str, str, str]]:
+    """Parse a pre-migration.py file to collect rename_fields tuples.
+
+    Returns list of (model, old_field, new_field, '').
+    """
+    try:
+        source = py_path.read_text(encoding="utf-8")
+    except Exception:
+        return []
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    # Map variable name -> list of (model, old_field, new_field)
+    tuple_assignments: dict[str, list[tuple[str, str, str]]] = {}
+
+    def _extract_tuple_list_from_sequence(node: ast.AST) -> list[tuple[str, str, str]] | None:
+        """Extract tuples from a List/Tuple literal.
+
+        Supports both 3-tuple: (model, old, new) and 4-tuple: (model, table, old, new)
+        by always taking element[0] as model and the last two elements as old/new.
+        """
+        items: list[tuple[str, str, str]] = []
+        seq = node.elts if isinstance(node, (ast.List, ast.Tuple)) else None
+        if seq is None:
+            return None
+        for elt in seq:
+            if isinstance(elt, (ast.List, ast.Tuple)) and len(elt.elts) >= 3:
+                # Use first element as model, and the last two as old/new
+                model_node = elt.elts[0]
+                old_node = elt.elts[-2]
+                new_node = elt.elts[-1]
+                if (
+                    isinstance(model_node, ast.Constant) and isinstance(model_node.value, str)
+                    and isinstance(old_node, ast.Constant) and isinstance(old_node.value, str)
+                    and isinstance(new_node, ast.Constant) and isinstance(new_node.value, str)
+                ):
+                    items.append((model_node.value, old_node.value, new_node.value))
+        return items or None
+
+    def _resolve_tuple_list_expression(expr: ast.AST) -> list[tuple[str, str, str]] | None:
+        """Resolve an expression into a list of (model, old, new) tuples.
+
+        Supports:
+        - Name: fetched from assignments
+        - List/Tuple literals
+        - BinOp(Add): concatenation of supported expressions (e.g., a + b)
+        """
+        if isinstance(expr, ast.Name):
+            return tuple_assignments.get(expr.id)
+        if isinstance(expr, (ast.List, ast.Tuple)):
+            return _extract_tuple_list_from_sequence(expr)
+        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
+            left = _resolve_tuple_list_expression(expr.left) or []
+            right = _resolve_tuple_list_expression(expr.right) or []
+            combined = left + right
+            return combined or None
+        return None
+
+    class AssignVisitor(ast.NodeVisitor):
+        def visit_Assign(self, node: ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    values = _extract_tuple_list_from_sequence(node.value) if isinstance(node.value, (ast.List, ast.Tuple)) else None
+                    if values:
+                        tuple_assignments[target.id] = values
+
+    class CallVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.renamed_field_tuples: list[tuple[str, str, str]] = []
+
+        def visit_Call(self, node: ast.Call):
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "rename_fields"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "openupgrade"
+            ):
+                if node.args and len(node.args) >= 2:
+                    arg2 = node.args[1]
+                    tuples = _resolve_tuple_list_expression(arg2)
+                    if tuples:
+                        self.renamed_field_tuples.extend(tuples)
+            self.generic_visit(node)
+
+    AssignVisitor().visit(tree)
+    cv = CallVisitor()
+    cv.visit(tree)
+    return cv.renamed_field_tuples

@@ -57,6 +57,28 @@ openupgrade-api/
     pip install -r requirements.txt
     ```
 
+## Configuration
+
+You can configure the application via environment variables (a `.env` file is supported through `python-dotenv`). Defaults are shown below:
+
+```
+# Flask server
+FLASK_HOST=localhost
+FLASK_PORT=5000
+DEBUG=False
+
+# Logging and CORS
+LOG_PATH=./logs
+LOG_LEVEL=INFO
+CORS_ALLOW=http://localhost:5001
+
+# Data locations
+DB_PATH=./databases
+OPENUPGRADE_REPO_URL=https://github.com/OCA/OpenUpgrade.git
+OPENUPGRADE_REPO_PATH=./OpenUpgrade_Repo
+OPENUPGRADE_SCRIPTS_SOURCES_PATH=./data_sources
+```
+
 ## Workflow
 
 The process involves two main steps executed via the `manage.py` script, followed by running the API server.
@@ -87,9 +109,9 @@ python manage.py parse
 python manage.py parse --versions 17.0 18.0
 ```
 
-### Step 3: Generate YAML for Removed Objects (optional)
+### Step 3: Generate YAML for Removed/Renamed Objects (optional)
 
-Use the `manage.py get` command to export removed models and removed fields in a format compatible with the odoo-module-migrator.
+Use the `manage.py get` command to export removed/renamed models and fields in a format compatible with the odoo-module-migrator.
 
 Prerequisites: You must have already run `sync` and `parse` for the target versions (so the SQLite DBs exist).
 
@@ -97,19 +119,30 @@ Examples:
 
 ```bash
 # Removed models for 18.0
-python manage.py get --object-type removed --object models --versions 18 --output-directory output
+python manage.py get --object-type removed --object models --versions 18.0 --output-directory output
 
 # Removed fields for 18.0
-python manage.py get --object-type removed --object fields --versions 18 --output-directory output
+python manage.py get --object-type removed --object fields --versions 18.0 --output-directory output
 
 # Multiple versions
-python manage.py get --object-type removed --object fields --versions 17 18 --output-directory output
+python manage.py get --object-type removed --object fields --versions 17.0 18.0 --output-directory output
+
+# Renamed models for 18.0
+python manage.py get --object-type renamed --object models --versions 18.0 --output-directory output
+
+# Renamed fields for 18.0
+python manage.py get --object-type renamed --object fields --versions 18.0 --output-directory output
 ```
 
 Output layout:
 
 - Removed models: `{output_dir}/removed_models/migrate_170_180/removed_models.yaml`
 - Removed fields: `{output_dir}/removed_fields/migrate_170_180/{module}.yaml`
+
+- Renamed models: `{output_dir}/renamed_models/migrate_170_180/renamed_models.yaml`
+  - Each line: ["old.model", "new.model", None]
+- Renamed fields: `{output_dir}/renamed_fields/migrate_170_180/{module}.yaml`
+  - Each line: ['model', 'old_field', 'new_field', '']
 
 Notes:
 
@@ -128,7 +161,7 @@ The API server will be running at `http://127.0.0.1:5000`.
 
 ## API Documentation
 
-The API provides one main endpoint for querying changes.
+The API provides endpoints for querying parsed changes and discovering available versions.
 
 ### Endpoint
 
@@ -163,3 +196,34 @@ curl "http://127.0.0.1:5000/17.0/changes?model=res.partner"
 ```bash
 curl "http://127.0.0.1:5000/18.0/changes?model=account.account&version=18.0.1.3"
 ```
+
+### Additional Endpoint
+
+#### `GET /upgrade_info`
+
+Returns an overview of supported versions (based on available SQLite databases in `DB_PATH`) and, for each version, a list of modules with concatenated model names seen in the data.
+
+- Response shape: a JSON object keyed by version string (e.g. `"18.0"`), each value is a list of objects: `{ "module": "<module_name>", "all_models": "model.a, model.b, ..." }`.
+
+Example:
+
+```bash
+curl "http://127.0.0.1:5000/upgrade_info"
+```
+
+```json
+{
+  "18.0": [
+    { "module": "account", "all_models": "account.move, account.move.line" },
+    { "module": "sale", "all_models": "sale.order, sale.order.line" }
+  ],
+  "17.0": [
+    { "module": "contacts", "all_models": "res.partner" }
+  ]
+}
+```
+
+Notes:
+
+- The endpoint discovers versions from files named `upgrade_<major>.db` in `DB_PATH`.
+- If a database for a version is missing, run `python manage.py parse --versions <major>` after syncing.
