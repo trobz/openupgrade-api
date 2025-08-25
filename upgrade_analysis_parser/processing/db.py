@@ -5,6 +5,10 @@ from typing import List
 
 from ..models import ChangeRecord
 
+from config import (
+    DB_PATH
+)
+
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -94,3 +98,13 @@ def insert_data(db_path: Path, data: List[ChangeRecord]) -> None:
         logger.info(
             f"Successfully inserted {len(rows_to_insert)} new records into {db_path.name}."
         )
+
+def db_path_for_version(major_version: float) -> Path:
+    return Path(DB_PATH) / f"upgrade_{major_version}.db"
+
+def ensure_db_exists(db_path: Path, version: float) -> bool:
+    if not db_path.exists():
+        logger.error(f"Database for version {version} not found at {db_path}.")
+        logger.error(f"Please run 'python manage.py parse --versions {version}' first.")
+        return False
+    return True

@@ -31,6 +31,7 @@ openupgrade-api/
         ├── __init__.py
         ├── db.py               # Database interaction functions
         ├── parser.py           # File parsing logic
+        ├── get.py              # CLI helpers to generate YAML (removed models/fields)
         └── sync.py             # GitHub synchronization logic
 ```
 
@@ -86,7 +87,36 @@ python manage.py parse
 python manage.py parse --versions 17.0 18.0
 ```
 
-### Step 3: Run the API Server
+### Step 3: Generate YAML for Removed Objects (optional)
+
+Use the `manage.py get` command to export removed models and removed fields in a format compatible with the odoo-module-migrator.
+
+Prerequisites: You must have already run `sync` and `parse` for the target versions (so the SQLite DBs exist).
+
+Examples:
+
+```bash
+# Removed models for 18.0
+python manage.py get --object-type removed --object models --versions 18 --output-directory output
+
+# Removed fields for 18.0
+python manage.py get --object-type removed --object fields --versions 18 --output-directory output
+
+# Multiple versions
+python manage.py get --object-type removed --object fields --versions 17 18 --output-directory output
+```
+
+Output layout:
+
+- Removed models: `{output_dir}/removed_models/migrate_170_180/removed_models.yaml`
+- Removed fields: `{output_dir}/removed_fields/migrate_170_180/{module}.yaml`
+
+Notes:
+
+- The migration folder name uses the convention `migrate_<from_version_no_dot>_<to_version_no_dot>` (e.g., `migrate_170_180`).
+- If a database is missing for a version, the command will instruct you to run `python manage.py parse --versions <version>`.
+
+### Step 4: Run the API Server
 
 Once the databases are created, start the Flask server.
 

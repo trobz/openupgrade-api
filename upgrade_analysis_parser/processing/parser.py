@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from ..models import ChangeRecord
-from .db import setup_database, clear_all_changes, insert_data
+from .db import setup_database, clear_all_changes, insert_data, db_path_for_version, ensure_db_exists
 
 import logging
 
@@ -112,8 +112,8 @@ class UpgradeAnalysisParser:
         )
 
 
-def run_parse_for_version(major_version: int, base_scripts_dir: Path, db_dir: Path):
-    db_path = db_dir / f"upgrade_{major_version}.db"
+def run_parse_for_version(major_version: int, base_scripts_dir: Path):
+    db_path = db_path_for_version(major_version)
     setup_database(db_path)
     clear_all_changes(db_path)
 

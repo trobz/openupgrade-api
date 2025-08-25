@@ -3,6 +3,7 @@ from pathlib import Path
 
 from upgrade_analysis_parser.processing.sync import clone_or_pull_repo, extract_data_for_version
 from upgrade_analysis_parser.processing.parser import run_parse_for_version
+from upgrade_analysis_parser.processing.get import generate_removed_models, generate_removed_fields
 
 from config import (
     OPENUPGRADE_REPO_URL,
@@ -42,6 +43,17 @@ def main() -> None:
         default=[16.0, 17.0, 18.0],
         help="Major version to parse (e.g., 18.0).",
     )
+    get_parser = subparsers.add_parser("get", help="Get data for odoo-module-migrator")
+    get_parser.add_argument("--object-type", choices=["removed"], required=True, help="Type of objects to get")
+    get_parser.add_argument("--object", choices=["models", "fields"], required=True, help="Object to get data")
+    get_parser.add_argument(
+        "--versions",
+        nargs="+",
+        type=float,
+        default=[16.0, 17.0, 18.0],
+        help="Major versions to include (e.g., 18.0 17.0).",
+    )
+    get_parser.add_argument("--output-directory", type=str, default=".", help="Output directory")
 
     args = parser.parse_args()
 
@@ -61,8 +73,20 @@ def main() -> None:
                     f"Please run 'python manage.py sync --versions {version}' first."
                 )
                 return
-            run_parse_for_version(version, version_scripts_path, Path(DB_PATH))
-
+            run_parse_for_version(version, version_scripts_path)
+    elif args.command == "get":
+        for version in args.versions:
+            version_dir = Path(args.output_directory) / f"{args.object_type}_{args.object}" / f"migrate_{str(version - 1).replace(".", "")}_{str(version).replace(".", "")}"
+            version_dir.mkdir(parents=True, exist_ok=True)
+            if args.object_type == "removed":
+                if args.object == "models":
+                    generate_removed_models(version, version_dir)
+                elif args.object == "fields":
+                    generate_removed_fields(version, version_dir)
+                else:
+                    logger.error(f"Unsupported object: {args.object}")
+            else:
+                logger.error(f"Unsupported object-type: {args.object_type}. Only 'removed' is implemented.")
 
 if __name__ == "__main__":
     main()
