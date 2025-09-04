@@ -5,7 +5,7 @@ from flask_restful import abort, Api, Resource
 from pathlib import Path
 from pydantic import ValidationError
 from config import (
-    FLASK_HOST, FLASK_PORT, DEBUG, DB_PATH, CORS_ALLOW,
+    FLASK_HOST, FLASK_PORT, DEBUG, DB_PATH, CORS_ALLOW, GOOGLE_ANALYTICS_ID,
 )
 
 from upgrade_analysis_parser.models import ChangeRecord
@@ -98,7 +98,7 @@ api.add_resource(ChangesResource, '/<float:major_version>/changes')
 
 @app.route('/')
 def index():
-    return render_template("index.html")
+    return render_template("index.html", GOOGLE_ANALYTICS_ID=GOOGLE_ANALYTICS_ID)
 
 @app.route('/upgrade_info')
 def upgrade_info():

@@ -14,3 +14,6 @@ DB_PATH = os.environ.get("DB_PATH", "./databases")
 OPENUPGRADE_REPO_URL = os.environ.get("OPENUPGRADE_REPO_URL", "https://github.com/OCA/OpenUpgrade.git")
 OPENUPGRADE_REPO_PATH = os.environ.get("OPENUPGRADE_REPO_PATH", "./OpenUpgrade_Repo")
 OPENUPGRADE_SCRIPTS_SOURCES_PATH = os.environ.get("OPENUPGRADE_SCRIPTS_SOURCES_PATH", "./data_sources")
+
+# Google Analytics
+GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "")

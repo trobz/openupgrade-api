@@ -77,6 +77,9 @@ DB_PATH=./databases
 OPENUPGRADE_REPO_URL=https://github.com/OCA/OpenUpgrade.git
 OPENUPGRADE_REPO_PATH=./OpenUpgrade_Repo
 OPENUPGRADE_SCRIPTS_SOURCES_PATH=./data_sources
+
+# Google Analytics
+GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
 ```
 
 ## Workflow
