@@ -5,10 +5,17 @@ from flask_restful import abort, Api, Resource
 from pathlib import Path
 from pydantic import ValidationError
 from config import (
-    FLASK_HOST, FLASK_PORT, DEBUG, DB_PATH, CORS_ALLOW, GOOGLE_ANALYTICS_ID,
+    FLASK_HOST, FLASK_PORT, DEBUG, DB_PATH, CORS_ALLOW, GOOGLE_ANALYTICS_ID, APRIORI_VERSIONS
 )
 
 from upgrade_analysis_parser.models import ChangeRecord
+from upgrade_analysis_parser.processing.db import sqlite_db
+from upgrade_analysis_parser.processing.apriori import get_apriori, query_apriori
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 api = Api(app)
@@ -27,20 +34,6 @@ def add_headers(response):
     response.headers['X-Application-Name'] = app_name
     return response
 
-
-def get_db_connection(major_version: float) -> sqlite3.Connection:
-    db_path = Path(DB_PATH) / f"upgrade_{major_version}.db"
-    if not db_path.exists():
-        abort(
-            404,
-            message=f"Database for version {major_version} not found. "
-            "Run 'python manage.py parse --version {major_version}' first.",
-        )
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 class ChangesResource(Resource):
     def get(self, major_version: float):
         module_filter = request.args.get('module')
@@ -48,29 +41,26 @@ class ChangesResource(Resource):
         minor_version_filter = request.args.get('version')
 
         try:
-            conn = get_db_connection(major_version)
-            cursor = conn.cursor()
+            with sqlite_db(major_version) as cursor:
+                query = "SELECT * FROM changes WHERE 1=1"
+                params = []
 
-            query = "SELECT * FROM changes WHERE 1=1"
-            params = []
+                if module_filter:
+                    query += " AND module = ?"
+                    params.append(module_filter)
 
-            if module_filter:
-                query += " AND module = ?"
-                params.append(module_filter)
+                if model_filter:
+                    query += " AND (model_name = ? OR record_model = ?)"
+                    params.extend([model_filter, model_filter])
 
-            if model_filter:
-                query += " AND (model_name = ? OR record_model = ?)"
-                params.extend([model_filter, model_filter])
+                if minor_version_filter:
+                    query += " AND version LIKE ?"
+                    params.append(f"{minor_version_filter}%")
 
-            if minor_version_filter:
-                query += " AND version LIKE ?"
-                params.append(f"{minor_version_filter}%")
+                query += " ORDER BY version DESC"
 
-            query += " ORDER BY version DESC"
-
-            cursor.execute(query, tuple(params))
-            rows = cursor.fetchall()
-            conn.close()
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
         except sqlite3.Error as e:
             abort(500, message=f"Database error occurred: {str(e)}")
 
@@ -94,7 +84,21 @@ class ChangesResource(Resource):
             abort(500, message=f"An unexpected processing error occurred: {str(e)}")
 
 
+class Apriori(Resource):
+    def get(self, version: None):
+        query = request.args.get('q')
+        only_table = request.args.get('table')
+        if only_table not in ["renamed_modules", "merged_modules"]:
+            only_table = None
+        if query:
+            logger.info(f"GET {request.full_path}")
+            return query_apriori(query, only_table)
+        logger.info(f"GET {request.path}")
+        apriori = get_apriori(version, only_table)
+        return apriori
+
 api.add_resource(ChangesResource, '/<float:major_version>/changes')
+api.add_resource(Apriori, '/api/apriori', '/api/apriori/<string:version>', '/api/apriori/<string:version>/')
 
 @app.route('/')
 def index():
@@ -102,25 +106,27 @@ def index():
 
 @app.route('/upgrade_info')
 def upgrade_info():
-    support_versions = [re.search(r'upgrade_(\d*\.\d+)\.db$', f).group(1)
-         for f in glob.glob(f'{DB_PATH}/upgrade_*.db')
-         if re.search(r'upgrade_(\d*\.\d+)\.db$', f)]
+    support_versions = [re.search(r'(\d*\.\d+)\.db$', f).group(1)
+         for f in glob.glob(f'{DB_PATH}/*.db')
+         if re.search(r'(\d*\.\d+)\.db$', f)]
+
     response = {}
     for version in support_versions:
-        
-        conn = get_db_connection(version)
-        cursor = conn.cursor()
+        with sqlite_db(version) as cursor:
+            query = "SELECT module, GROUP_CONCAT(all_models, ', ') AS all_models FROM ( SELECT DISTINCT module, COALESCE(model_name, record_model) AS all_models FROM changes ) AS sub GROUP BY module;"
 
-        query = "SELECT module, GROUP_CONCAT(all_models, ', ') AS all_models FROM ( SELECT DISTINCT module, COALESCE(model_name, record_model) AS all_models FROM changes ) AS sub GROUP BY module;"
+            cursor.execute(query)
+            rows = cursor.fetchall()
 
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        conn.close()
-
-        data = [dict(row) for row in rows]
-        response[version] = data
+            data = [dict(row) for row in rows]
+            response[version] = data
 
     return response
+
+@app.route('/api/apriori/support_versions')
+def support_version():
+    support_version = APRIORI_VERSIONS.split(',')
+    return json.dumps(support_version)
 
 if __name__ == '__main__':
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=DEBUG)

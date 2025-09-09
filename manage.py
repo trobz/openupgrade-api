@@ -3,6 +3,7 @@ from pathlib import Path
 
 from upgrade_analysis_parser.processing.sync import clone_or_pull_repo, extract_data_for_version
 from upgrade_analysis_parser.processing.parser import run_parse_for_version
+from upgrade_analysis_parser.processing.apriori import parse_apriori
 from upgrade_analysis_parser.processing.get import (
     generate_removed_models,
     generate_removed_fields,
@@ -48,6 +49,8 @@ def main() -> None:
         default=[16.0, 17.0, 18.0],
         help="Major version to parse (e.g., 18.0).",
     )
+    subparsers.add_parser("apriori", help="Parse apriori data")
+
     get_parser = subparsers.add_parser("get", help="Get data for odoo-module-migrator")
     get_parser.add_argument("--object-type", choices=["removed", "renamed"], required=True, help="Type of objects to get")
     get_parser.add_argument("--object", choices=["models", "fields"], required=True, help="Object to get data")
@@ -79,6 +82,9 @@ def main() -> None:
                 )
                 return
             run_parse_for_version(version, version_scripts_path)
+    elif args.command == "apriori":
+        parse_apriori()
+
     elif args.command == "get":
         for version in args.versions:
             version_dir = Path(args.output_directory) / f"{args.object_type}_{args.object}" / f"migrate_{str(version - 1).replace('.', '')}_{str(version).replace('.', '')}"

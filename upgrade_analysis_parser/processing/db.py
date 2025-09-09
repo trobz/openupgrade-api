@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import contextlib
 from pathlib import Path
 from typing import List
 
@@ -14,6 +15,30 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@contextlib.contextmanager
+def sqlite_db(version: float, clean: bool = False):
+    db_path = Path(DB_PATH) / f"{version}.db"
+    if clean and db_path.exists():
+        db_path.unlink()
+    logger.debug(f"Connecting to {db_path}")
+    if not db_path.exists() and not clean:
+        err_msg = 'Database %s does not exist' % db_path
+        logger.error(err_msg)
+        raise OSError(err_msg)
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        yield cursor
+    except Exception:
+        conn.rollback()
+        raise
+    else:
+        conn.commit()
+    finally:
+        conn.close()
 
 def setup_database(db_path: Path) -> None:
     with sqlite3.connect(db_path) as conn:
@@ -100,7 +125,7 @@ def insert_data(db_path: Path, data: List[ChangeRecord]) -> None:
         )
 
 def db_path_for_version(major_version: float) -> Path:
-    return Path(DB_PATH) / f"upgrade_{major_version}.db"
+    return Path(DB_PATH) / f"{major_version}.db"
 
 def ensure_db_exists(db_path: Path, version: float) -> bool:
     if not db_path.exists():
