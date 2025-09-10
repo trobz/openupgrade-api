@@ -4,3 +4,4 @@ pydantic
 GitPython
 tqdm
 dotenv
+requests

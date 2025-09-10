@@ -10,19 +10,19 @@ def _fetch_apriori_from_db(cursor, table, key_col, value_col, filter_col, filter
 
 def _fetch_apriori_from_csv(path, version=None, query=None):
     results = {}
-    with open(path, "r") as file:
-        csv_file = csv.reader(file.read().splitlines())
+    with open(path, "r", newline="", encoding="utf-8") as file:
+        csv_file = csv.reader(file)
         for row in csv_file:
-            module_name, repo, raw_version, status, target = row[:5] if len(row) > 4 else None
+            module_name, repo, raw_version, status, detail, references = row[:6] if len(row) > 5 else None
             norm_version = normalize_version(raw_version)
 
             if version:
                 if norm_version != version:
                     continue
                 if status == "not needed anymore":
-                    results.setdefault("not_needed", {})[module_name] = "odoo"
+                    results.setdefault("not_needed", {})[module_name] = (detail, references)
                 elif status == "moved to different repo":
-                    results.setdefault("moved_modules", {})[module_name] = target
+                    results.setdefault("moved_modules", {})[module_name] = detail
             
             elif query:
                 if module_name != query:
@@ -31,7 +31,7 @@ def _fetch_apriori_from_csv(path, version=None, query=None):
                 if status == "not needed anymore":
                     ver_dict.setdefault("not_needed", {})[module_name] = "odoo"
                 elif status == "moved to different repo":
-                    ver_dict.setdefault("moved_modules", {})[module_name] = target
+                    ver_dict.setdefault("moved_modules", {})[module_name] = detail
     return results
 
 def get_apriori(version, only_table = None):
