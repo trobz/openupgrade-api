@@ -1,3 +1,6 @@
+# Copyright 2025 Trobz
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl)
+
 import requests, os, csv
 from .db import sqlite_db
 from config import APRIORI_VERSIONS, APRIORI_INTERNAL_DOCUMENT_PATH, APRIORI_INTERNAL_DOCUMENT_NAME, APRIORI_INTERNAL_DOCUMENT_URL

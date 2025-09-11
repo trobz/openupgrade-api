@@ -1,3 +1,6 @@
+# Copyright 2025 Trobz
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl)
+
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 

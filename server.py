@@ -1,3 +1,6 @@
+# Copyright 2025 Trobz
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl)
+
 import sqlite3
 import json, glob, re
 from flask import Flask, request, render_template

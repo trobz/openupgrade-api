@@ -230,3 +230,12 @@ Notes:
 
 - The endpoint discovers versions from files named `upgrade_<major>.db` in `DB_PATH`.
 - If a database for a version is missing, run `python manage.py parse --versions <major>` after syncing.
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0.
+
+- Full text: see the `LICENSE` file at the repository root
+- SPDX identifier: `AGPL-3.0-or-later`
+
+By contributing to this repository, you agree that your contributions will be licensed under the same AGPL-3.0-or-later license.
